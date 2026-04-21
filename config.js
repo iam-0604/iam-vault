@@ -7,5 +7,5 @@
 // 4. Push to GitHub — Vercel will auto-redeploy
 // =====================================================
 
-window.SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
-window.SUPABASE_KEY = 'YOUR_ANON_PUBLIC_KEY';
+window.SUPABASE_URL = 'https://frdkcufeikwlbtaadvif.supabase.co.supabase.co';
+window.SUPABASE_KEY = 'sb_publishable_FWxiT4Qf9SvRHVkKygQe0g_wJssRUso';
