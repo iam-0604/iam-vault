@@ -7,5 +7,5 @@
 // 4. Push to GitHub — Vercel will auto-redeploy
 // =====================================================
 
-window.SUPABASE_URL = 'https://frdkcufeikwlbtaadvif.supabase.co.supabase.co';
-window.SUPABASE_KEY = 'sb_publishable_FWxiT4Qf9SvRHVkKygQe0g_wJssRUso';
+window.SUPABASE_URL = 'https://frdkcufeikwlbtaadvif.supabase.co;
+window.SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyZGtjdWZlaWt3bGJ0YWFkdmlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NDMwNTUsImV4cCI6MjA5MjMxOTA1NX0.BDPOf6gL7N42NHtcYs4kiGvodj6dkyRnavSv_TB6dTA';
