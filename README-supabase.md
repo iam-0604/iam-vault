@@ -106,12 +106,23 @@ window.SUPABASE_KEY = 'YOUR_ANON_PUBLIC_KEY';
 
 Find these at: **Supabase Dashboard → Project Settings → API**
 
+Use the **anon / public** key here. Do not use the service role key in a browser app.
+
 ### 3. Deploy to Vercel
 
 1. Push this repo to GitHub
 2. Go to **vercel.com** → Import project → select `iam-vault`
-3. No build settings needed — click **Deploy**
-4. Done. Your URL: `https://iam-vault-[hash].vercel.app`
+3. No build settings needed. Keep the framework preset as **Other**
+4. Make sure the repo root contains `index.html`, `config.js`, and `vercel.json`
+5. Click **Deploy**
+6. Done. Your URL: `https://iam-vault-[hash].vercel.app`
+
+### Common deployment issues
+
+- `404` on the Vercel URL: the app entry file must be named `index.html`
+- `Supabase not configured`: `config.js` still has placeholder values
+- `Failed to connect to Supabase`: confirm your project URL is correct, the key is the anon key, and the SQL tables/policies were created in the same project
+- Data loads fail with permissions errors: verify Row Level Security policies exist on all four tables
 
 ---
 
