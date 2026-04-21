@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IAM Vault</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117;
+  --bg-surface: #161b27;
+  --bg-card: #1c2333;
+  --bg-hover: #232b3e;
+  --border: rgba(255,255,255,0.07);
+  --border-mid: rgba(255,255,255,0.12);
+  --accent: #3b82f6;
+  --accent-dim: rgba(59,130,246,0.15);
+  --green: #22c55e;
+  --green-dim: rgba(34,197,94,0.12);
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,0.12);
+  --red: #ef4444;
+  --red-dim: rgba(239,68,68,0.12);
+  --gray-dim: rgba(255,255,255,0.06);
+  --text-primary: #e8eaf0;
+  --text-secondary: #8892a4;
+  --text-muted: #4f5a6e;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body { font-family: var(--sans); background: var(--bg); color: var(--text-primary); min-height: 100vh; line-height: 1.5; }
+
+.shell { display: flex; min-height: 100vh; }
+.sidebar { width: 220px; min-width: 220px; background: var(--bg-surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+.sidebar-logo { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
+.sidebar-logo .wordmark { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; }
+.sidebar-logo .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.nav { padding: 12px 0; flex: 1; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; font-size: 13px; color: var(--text-secondary); cursor: pointer; border-left: 2px solid transparent; transition: all 0.15s; user-select: none; }
+.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
+.nav-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+.nav-item.active .nav-icon { opacity: 1; }
+.nav-section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted); padding: 16px 20px 6px; text-transform: uppercase; }
+.sidebar-footer { padding: 16px 20px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+.sync-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 6px; animation: pulse 2s infinite; }
+.sync-dot.error { background: var(--red); animation: none; }
+.sync-dot.loading { background: var(--amber); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.topbar { padding: 16px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--bg-surface); position: sticky; top: 0; z-index: 10; }
+.topbar-title { font-size: 15px; font-weight: 500; }
+.topbar-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; font-family: var(--mono); }
+.topbar-actions { display: flex; gap: 8px; align-items: center; }
+.sync-status { font-family: var(--mono); font-size: 11px; color: var(--text-muted); display: flex; align-items: center; }
+
+.content { padding: 24px 28px; flex: 1; overflow-y: auto; }
+
+.metrics-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+.metric-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; position: relative; overflow: hidden; }
+.metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+.metric-card.green::before { background: var(--green); }
+.metric-card.amber::before { background: var(--amber); }
+.metric-card.red::before { background: var(--red); }
+.metric-card.blue::before { background: var(--accent); }
+.metric-label { font-size: 11px; color: var(--text-muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+.metric-value { font-size: 28px; font-weight: 600; line-height: 1; font-family: var(--mono); }
+.metric-card.green .metric-value { color: var(--green); }
+.metric-card.amber .metric-value { color: var(--amber); }
+.metric-card.red .metric-value { color: var(--red); }
+.metric-card.blue .metric-value { color: var(--accent); }
+.metric-sub { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-family: var(--sans); border-radius: var(--radius); border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--text-primary); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn:hover { background: var(--bg-hover); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+.btn.primary:hover { background: #2563eb; }
+.btn.sm { padding: 5px 10px; font-size: 12px; }
+.btn.danger { border-color: rgba(239,68,68,0.3); color: var(--red); }
+.btn.danger:hover { background: var(--red-dim); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.table-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.table-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.table-header-title { font-size: 13px; font-weight: 500; margin-right: auto; }
+input[type=text], input[type=date], input[type=email], select, textarea { background: var(--bg-surface); border: 1px solid var(--border-mid); border-radius: var(--radius); color: var(--text-primary); font-family: var(--sans); font-size: 13px; padding: 7px 10px; outline: none; transition: border-color 0.15s; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+input::placeholder { color: var(--text-muted); }
+select option { background: var(--bg-surface); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 14px; font-size: 11px; font-family: var(--mono); font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg-hover); }
+.cell-secondary { color: var(--text-secondary); font-size: 12px; }
+.cell-mono { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; font-family: var(--mono); white-space: nowrap; }
+.badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+.badge.active { background: var(--green-dim); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+.badge.active::before { background: var(--green); }
+.badge.pending { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+.badge.pending::before { background: var(--amber); }
+.badge.overdue { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+.badge.overdue::before { background: var(--red); }
+.badge.revoked { background: var(--gray-dim); color: var(--text-secondary); border: 1px solid var(--border); }
+.badge.revoked::before { background: var(--text-muted); }
+.badge.keep { background: var(--green-dim); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+.badge.keep::before { background: var(--green); }
+.badge.revoke-d { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+.badge.revoke-d::before { background: var(--red); }
+
+.empty-state { text-align: center; padding: 48px 24px; color: var(--text-muted); font-size: 13px; font-family: var(--mono); }
+.skeleton { background: var(--bg-hover); border-radius: 4px; animation: shimmer 1.5s infinite; }
+@keyframes shimmer { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+#toast { position: fixed; bottom: 24px; right: 24px; background: var(--bg-card); border: 1px solid rgba(34,197,94,0.3); border-radius: var(--radius-lg); padding: 12px 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; z-index: 1000; transform: translateY(80px); opacity: 0; transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1); max-width: 360px; }
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.error-toast { border-color: rgba(239,68,68,0.3); }
+.toast-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; flex-shrink: 0; }
+.toast-dot.red { background: var(--red); }
+.toast-close { margin-left: auto; color: var(--text-muted); cursor: pointer; font-size: 16px; line-height: 1; }
+
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow-y: auto; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: var(--radius-lg); width: 100%; max-width: 640px; animation: slideUp 0.2s ease; }
+@keyframes slideUp { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
+.modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; }
+.modal-title { font-size: 15px; font-weight: 500; }
+.modal-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 3px; font-family: var(--mono); }
+.modal-close { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; }
+.modal-close:hover { color: var(--text-primary); }
+.modal-body { padding: 20px 24px; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-footer-right { display: flex; gap: 8px; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-label { font-size: 11px; font-family: var(--mono); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+.form-label .req { color: var(--red); margin-left: 2px; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; }
+.form-group textarea { resize: vertical; min-height: 72px; }
+.form-group input.error, .form-group select.error { border-color: var(--red) !important; }
+.form-divider { grid-column: 1 / -1; border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+.form-section-label { grid-column: 1 / -1; font-size: 11px; font-family: var(--mono); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+.form-error { font-size: 12px; color: var(--red); margin-top: 8px; display: none; font-family: var(--mono); }
+
+.view { display: none; }
+.view.active { display: block; }
+
+.confirm-modal { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: var(--radius-lg); padding: 24px; max-width: 400px; width: 100%; }
+.confirm-title { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+.confirm-body { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px; }
+.confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Config banner */
+.config-banner { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: var(--amber); font-family: var(--mono); display: none; }
+.config-banner.show { display: block; }
+.config-banner a { color: var(--accent); }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="wordmark">IAM Vault</div>
+      <div class="sub">Role Lifecycle Manager</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section-label">Dashboard</div>
+      <div class="nav-item active" onclick="showView('active',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+        Active roles
+      </div>
+      <div class="nav-item" onclick="showView('pending',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 5v3.5l2 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Pending approvals
+        <span id="pending-badge" style="margin-left:auto;background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,0.3);font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:20px;"></span>
+      </div>
+      <div class="nav-section-label">Review</div>
+      <div class="nav-item" onclick="showView('audit',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="13" cy="11" r="2.5" stroke="currentColor" stroke-width="1.2"/></svg>
+        Audit queue
+        <span id="audit-badge" style="margin-left:auto;background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,0.3);font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:20px;"></span>
+      </div>
+      <div class="nav-item" onclick="showView('revoked',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Revoked roles
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-label">Connecting...</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <div class="topbar-title" id="topbar-title">Active roles</div>
+        <div class="topbar-sub" id="topbar-sub">All currently approved access records</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn" onclick="exportCSV()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 10v2h10v-2M7 2v7M4.5 6.5L7 9l2.5-2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Export CSV
+        </button>
+        <button class="btn" onclick="loadAll()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 1 10 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M12 7l-2-2M12 7l-2 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          Refresh
+        </button>
+        <button class="btn primary" onclick="openLogForm()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Log approved role
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="config-banner" id="config-banner">
+        ⚠ Supabase not configured — add your SUPABASE_URL and SUPABASE_KEY in config.js. <a href="https://supabase.com/dashboard" target="_blank">Open Supabase dashboard →</a>
+      </div>
+
+      <div class="metrics-row">
+        <div class="metric-card green"><div class="metric-label">Active roles</div><div class="metric-value" id="m-active">—</div><div class="metric-sub">Total provisioned</div></div>
+        <div class="metric-card amber"><div class="metric-label">Pending approvals</div><div class="metric-value" id="m-pending">—</div><div class="metric-sub">Awaiting sign-off</div></div>
+        <div class="metric-card red"><div class="metric-label">Audit overdue</div><div class="metric-value" id="m-overdue">—</div><div class="metric-sub">Past review date</div></div>
+        <div class="metric-card blue"><div class="metric-label">Revoked (YTD)</div><div class="metric-value" id="m-revoked">—</div><div class="metric-sub">Access removed</div></div>
+      </div>
+
+      <!-- ACTIVE ROLES -->
+      <div class="view active" id="view-active">
+        <div class="table-section">
+          <div class="table-header">
+            <span class="table-header-title">Role records</span>
+            <input type="text" id="f-search" placeholder="Search user, role, ticket..." style="width:200px" oninput="renderActive()">
+            <select id="f-dept" onchange="renderActive()"><option value="">All departments</option></select>
+            <select id="f-cc" onchange="renderActive()"><option value="">All cost centers</option></select>
+            <select id="f-app" onchange="renderActive()"><option value="">All applications</option></select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>User</th><th>Job title</th><th>Dept</th><th>Cost center</th><th>Application</th><th>Role</th><th>Access</th><th>Approved</th><th>Next audit</th><th>Status</th><th>Ticket</th><th></th></tr></thead>
+              <tbody id="active-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PENDING -->
+      <div class="view" id="view-pending">
+        <div class="table-section">
+          <div class="table-header">
+            <span class="table-header-title">Pending approvals</span>
+            <button class="btn sm" onclick="openPendingForm()">+ Add request</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Request ID</th><th>User</th><th>Role requested</th><th>Application</th><th>Submitted</th><th>Awaiting</th><th>SLA deadline</th><th>Status</th><th></th></tr></thead>
+              <tbody id="pending-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUDIT -->
+      <div class="view" id="view-audit">
+        <div class="table-section">
+          <div class="table-header">
+            <span class="table-header-title">Audit queue</span>
+            <span style="font-size:12px;color:var(--text-muted);font-family:var(--mono)">Half-yearly / annual review cycle</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>User</th><th>Role</th><th>Application</th><th>Last certified</th><th>Due date</th><th>Manager</th><th>Manager response</th><th>Decision</th><th></th></tr></thead>
+              <tbody id="audit-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- REVOKED -->
+      <div class="view" id="view-revoked">
+        <div class="table-section">
+          <div class="table-header">
+            <span class="table-header-title">Revoked roles</span>
+            <span style="font-size:12px;color:var(--text-muted);font-family:var(--mono)">Audit trail of all removed access</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>User</th><th>Role</th><th>Application</th><th>Approved date</th><th>Revoked date</th><th>Reason</th><th>Revoked by</th></tr></thead>
+              <tbody id="revoked-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOG ROLE MODAL -->
+<div class="modal-overlay" id="log-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div><div class="modal-title">Log approved role</div><div class="modal-subtitle">Fill in details from the Jira / ServiceNow approval thread</div></div>
+      <button class="modal-close" onclick="closeLogForm()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-section-label">Requester details</div>
+        <div class="form-group"><label class="form-label">Full name <span class="req">*</span></label><input type="text" id="lf-name" placeholder="John Smith"></div>
+        <div class="form-group"><label class="form-label">Employee email <span class="req">*</span></label><input type="email" id="lf-email" placeholder="john.smith@company.com"></div>
+        <div class="form-group"><label class="form-label">Job title <span class="req">*</span></label><input type="text" id="lf-title" placeholder="Finance Analyst"></div>
+        <div class="form-group"><label class="form-label">Department <span class="req">*</span></label>
+          <select id="lf-dept"><option value="">Select department</option><option>Finance</option><option>HR</option><option>IT</option><option>Compliance</option><option>Operations</option><option>Legal</option><option>Other</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Cost center <span class="req">*</span></label><input type="text" id="lf-cc" placeholder="CC-1020"></div>
+        <div class="form-group"><label class="form-label">Line manager</label><input type="text" id="lf-manager" placeholder="Jane Doe"></div>
+        <hr class="form-divider">
+        <div class="form-section-label">Role details</div>
+        <div class="form-group"><label class="form-label">Application <span class="req">*</span></label>
+          <select id="lf-app" onchange="updateRoles()"><option value="">Select application</option><option>SAP</option><option>Workday</option><option>AWS</option><option>Archer</option><option>Salesforce</option><option>Other</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Role approved <span class="req">*</span></label><select id="lf-role"><option value="">Select application first</option></select></div>
+        <div class="form-group"><label class="form-label">Access level</label>
+          <select id="lf-access"><option value="">Select level</option><option>Read</option><option>Write</option><option>Admin</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Ticket reference <span class="req">*</span></label><input type="text" id="lf-ticket" placeholder="JIRA-4901"></div>
+        <div class="form-group"><label class="form-label">Date approved <span class="req">*</span></label><input type="date" id="lf-date"></div>
+        <div class="form-group"><label class="form-label">Next audit due</label><input type="date" id="lf-audit"></div>
+        <div class="form-group full"><label class="form-label">Approval notes</label><textarea id="lf-notes" placeholder="Context from the approval email thread..."></textarea></div>
+      </div>
+      <div class="form-error" id="lf-error">Please fill in all required fields marked with *</div>
+    </div>
+    <div class="modal-footer">
+      <div style="font-size:12px;color:var(--text-muted)">Fields marked * are required</div>
+      <div class="modal-footer-right">
+        <button class="btn" onclick="closeLogForm()">Cancel</button>
+        <button class="btn primary" id="lf-submit" onclick="submitLogForm()">Log role</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PENDING MODAL -->
+<div class="modal-overlay" id="pending-modal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <div><div class="modal-title">Add pending request</div><div class="modal-subtitle">Log a request awaiting approval</div></div>
+      <button class="modal-close" onclick="closePendingForm()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Request ID <span class="req">*</span></label><input type="text" id="pf-id" placeholder="JIRA-5001"></div>
+        <div class="form-group"><label class="form-label">User name <span class="req">*</span></label><input type="text" id="pf-user" placeholder="Mark Hughes"></div>
+        <div class="form-group"><label class="form-label">Application <span class="req">*</span></label>
+          <select id="pf-app" onchange="updatePendingRoles()"><option value="">Select application</option><option>SAP</option><option>Workday</option><option>AWS</option><option>Archer</option><option>Salesforce</option><option>Other</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Role requested <span class="req">*</span></label><select id="pf-role"><option value="">Select application first</option></select></div>
+        <div class="form-group"><label class="form-label">Submitted date <span class="req">*</span></label><input type="date" id="pf-submitted"></div>
+        <div class="form-group"><label class="form-label">SLA deadline <span class="req">*</span></label><input type="date" id="pf-sla"></div>
+        <div class="form-group full"><label class="form-label">Awaiting approval from <span class="req">*</span></label>
+          <select id="pf-awaiting"><option value="">Select approver stage</option><option>Line Manager</option><option>IAM Admin</option><option>Line Manager + IAM Admin</option></select>
+        </div>
+      </div>
+      <div class="form-error" id="pf-error">Please fill in all required fields.</div>
+    </div>
+    <div class="modal-footer">
+      <div></div>
+      <div class="modal-footer-right">
+        <button class="btn" onclick="closePendingForm()">Cancel</button>
+        <button class="btn primary" id="pf-submit" onclick="submitPendingForm()">Add request</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="confirm-modal">
+    <div class="confirm-title" id="confirm-title">Confirm action</div>
+    <div class="confirm-body" id="confirm-body">Are you sure?</div>
+    <div class="confirm-actions">
+      <button class="btn" onclick="closeConfirm()">Cancel</button>
+      <button class="btn danger" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><div class="toast-dot" id="toast-dot"></div><span id="toast-msg"></span><span class="toast-close" onclick="hideToast()">&times;</span></div>
+
+<script>
+const SUPABASE_URL = window.SUPABASE_URL || '';
+const SUPABASE_KEY = window.SUPABASE_KEY || '';
+
+const TODAY = new Date().toISOString().split('T')[0];
+
+const ROLE_MAP = {
+  SAP: ['SAP Finance Read','SAP Finance Write','SAP HR Viewer','SAP Admin'],
+  Workday: ['HR Data Viewer','HR Admin','Payroll Viewer','Workday Read-Only'],
+  AWS: ['EC2 Read-Only','S3 Read-Only','EC2 Full Access','AWS Admin'],
+  Archer: ['Risk Viewer','Risk Editor','Compliance Admin'],
+  Salesforce: ['Sales Read','Sales Write','Salesforce Admin'],
+  Other: ['Custom Role']
+};
+
+const VIEW_META = {
+  active: { title: 'Active roles', sub: 'All currently approved access records' },
+  pending: { title: 'Pending approvals', sub: 'Requests awaiting line manager or IAM admin sign-off' },
+  audit: { title: 'Audit queue', sub: 'Roles due for half-yearly or annual recertification review' },
+  revoked: { title: 'Revoked roles', sub: 'Audit trail of all access removed by IAM admin team' },
+};
+
+let activeRoles = [], pendingApprovals = [], auditQueue = [], revokedRoles = [];
+let connected = false;
+
+async function api(method, table, body, id) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Not configured');
+  const url = id
+    ? `${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`
+    : `${SUPABASE_URL}/rest/v1/${table}`;
+  const headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': method === 'POST' ? 'return=representation' : 'return=representation'
+  };
+  const res = await fetch(url + (method === 'GET' ? '?order=created_at.desc' : ''), { method, headers, body: body ? JSON.stringify(body) : undefined });
+  if (!res.ok) { const e = await res.text(); throw new Error(e); }
+  if (method === 'DELETE') return;
+  return res.json();
+}
+
+async function loadAll() {
+  setSyncState('loading');
+  try {
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      document.getElementById('config-banner').classList.add('show');
+      setSyncState('error');
+      return;
+    }
+    const [ar, pa, aq, rr] = await Promise.all([
+      api('GET','active_roles'),
+      api('GET','pending_approvals'),
+      api('GET','audit_queue'),
+      api('GET','revoked_roles'),
+    ]);
+    activeRoles = ar || [];
+    pendingApprovals = pa || [];
+    auditQueue = aq || [];
+    revokedRoles = rr || [];
+    connected = true;
+    setSyncState('connected');
+    renderAll();
+  } catch(e) {
+    setSyncState('error');
+    showToast('Failed to connect to Supabase: ' + e.message, true);
+  }
+}
+
+function setSyncState(state) {
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  dot.className = 'sync-dot';
+  if (state === 'connected') { label.textContent = 'Live'; }
+  else if (state === 'loading') { dot.classList.add('loading'); label.textContent = 'Syncing...'; }
+  else { dot.classList.add('error'); label.textContent = 'Offline'; }
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+}
+function isOverdue(d) { return d && d < TODAY; }
+function addMonths(d, m) { const dt = new Date(d+'T00:00:00'); dt.setMonth(dt.getMonth()+m); return dt.toISOString().split('T')[0]; }
+
+function populateFilters() {
+  const set = (id, vals) => {
+    const sel = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">All ${id.replace('f-','')}</option>` + [...new Set(vals)].sort().map(v=>`<option${v===prev?' selected':''}>${v}</option>`).join('');
+  };
+  set('f-dept', activeRoles.map(r=>r.department));
+  set('f-cc', activeRoles.map(r=>r.cost_center));
+  set('f-app', activeRoles.map(r=>r.application));
+}
+
+function renderActive() {
+  const search = document.getElementById('f-search').value.toLowerCase();
+  const dept = document.getElementById('f-dept').value;
+  const cc = document.getElementById('f-cc').value;
+  const app = document.getElementById('f-app').value;
+  const filtered = activeRoles.filter(r =>
+    (!search || r.user_name?.toLowerCase().includes(search) || r.role_name?.toLowerCase().includes(search) || r.ticket_ref?.toLowerCase().includes(search)) &&
+    (!dept || r.department === dept) && (!cc || r.cost_center === cc) && (!app || r.application === app)
+  );
+  const tbody = document.getElementById('active-body');
+  if (!filtered.length) { tbody.innerHTML = `<tr><td colspan="12" class="empty-state">No records found.</td></tr>`; return; }
+  tbody.innerHTML = filtered.map(r => {
+    const ov = isOverdue(r.next_audit_date);
+    const badge = ov ? '<span class="badge overdue">Audit overdue</span>' : '<span class="badge active">Active</span>';
+    return `<tr>
+      <td><span style="font-weight:500">${r.user_name}</span><br><span class="cell-secondary">${r.email||''}</span></td>
+      <td class="cell-secondary">${r.job_title||''}</td>
+      <td class="cell-secondary">${r.department||''}</td>
+      <td class="cell-secondary">${r.cost_center||''}</td>
+      <td>${r.application||''}</td>
+      <td>${r.role_name||''}</td>
+      <td class="cell-secondary">${r.access_level||'—'}</td>
+      <td class="cell-secondary">${fmtDate(r.approved_date)}</td>
+      <td style="color:${ov?'var(--red)':'var(--text-secondary)'}">${fmtDate(r.next_audit_date)}</td>
+      <td>${badge}</td>
+      <td><span class="cell-mono">${r.ticket_ref||''}</span></td>
+      <td><button class="btn sm danger" onclick="confirmRevoke('${r.id}','${r.user_name}','${r.role_name}')">Revoke</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPending() {
+  const tbody = document.getElementById('pending-body');
+  if (!pendingApprovals.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state">No pending approvals.</td></tr>`; return; }
+  tbody.innerHTML = pendingApprovals.map(p => {
+    const ov = isOverdue(p.sla_date);
+    const badge = ov ? '<span class="badge overdue">SLA breached</span>' : '<span class="badge pending">Pending</span>';
+    return `<tr>
+      <td><span class="cell-mono">${p.request_id}</span></td>
+      <td style="font-weight:500">${p.user_name}</td>
+      <td>${p.role_name}</td>
+      <td>${p.application}</td>
+      <td class="cell-secondary">${fmtDate(p.submitted_date)}</td>
+      <td class="cell-secondary">${p.awaiting}</td>
+      <td style="color:${ov?'var(--red)':'var(--text-secondary)'}">${fmtDate(p.sla_date)}</td>
+      <td>${badge}</td>
+      <td><button class="btn sm" onclick="markApproved('${p.id}','${p.request_id}','${p.user_name}')">Mark approved</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderAudit() {
+  const tbody = document.getElementById('audit-body');
+  if (!auditQueue.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-state">No roles in audit queue.</td></tr>`; return; }
+  tbody.innerHTML = auditQueue.map(a => {
+    const badge = a.decision === 'keep' ? '<span class="badge keep">Keep</span>'
+      : a.decision === 'revoke' ? '<span class="badge revoke-d">Revoke</span>'
+      : '<span class="badge pending">Awaiting</span>';
+    const actions = a.decision === 'pending'
+      ? `<button class="btn sm" onclick="resolveAudit('${a.id}','${a.user_name}','${a.role_name}','${a.application}','keep')">Keep</button> <button class="btn sm danger" onclick="resolveAudit('${a.id}','${a.user_name}','${a.role_name}','${a.application}','revoke')">Revoke</button>`
+      : '<span class="cell-secondary" style="font-size:12px">Resolved</span>';
+    return `<tr>
+      <td style="font-weight:500">${a.user_name}</td>
+      <td>${a.role_name}</td>
+      <td>${a.application}</td>
+      <td class="cell-secondary">${fmtDate(a.last_certified)}</td>
+      <td style="color:var(--red)">${fmtDate(a.due_date)}</td>
+      <td class="cell-secondary">${a.manager||'—'}</td>
+      <td class="cell-secondary" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.manager_response||'—'}</td>
+      <td>${badge}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderRevoked() {
+  const tbody = document.getElementById('revoked-body');
+  if (!revokedRoles.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No revoked roles recorded.</td></tr>`; return; }
+  tbody.innerHTML = revokedRoles.map(r => `<tr>
+    <td style="font-weight:500">${r.user_name}</td>
+    <td>${r.role_name}</td>
+    <td>${r.application}</td>
+    <td class="cell-secondary">${fmtDate(r.approved_date)}</td>
+    <td class="cell-secondary">${fmtDate(r.revoked_date)}</td>
+    <td class="cell-secondary">${r.reason||'—'}</td>
+    <td class="cell-secondary">${r.revoked_by||'IAM Admin'}</td>
+  </tr>`).join('');
+}
+
+function updateMetrics() {
+  const overdue = activeRoles.filter(r => isOverdue(r.next_audit_date)).length;
+  document.getElementById('m-active').textContent = activeRoles.length;
+  document.getElementById('m-pending').textContent = pendingApprovals.length;
+  document.getElementById('m-overdue').textContent = overdue;
+  document.getElementById('m-revoked').textContent = revokedRoles.length;
+  document.getElementById('pending-badge').textContent = pendingApprovals.length;
+  document.getElementById('audit-badge').textContent = auditQueue.filter(a=>a.decision==='pending').length;
+}
+
+function renderAll() { populateFilters(); updateMetrics(); renderActive(); renderPending(); renderAudit(); renderRevoked(); }
+
+function showView(view, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('view-' + view).classList.add('active');
+  document.getElementById('topbar-title').textContent = VIEW_META[view].title;
+  document.getElementById('topbar-sub').textContent = VIEW_META[view].sub;
+}
+
+function updateRoles() {
+  const app = document.getElementById('lf-app').value;
+  document.getElementById('lf-role').innerHTML = '<option value="">Select role</option>' + (ROLE_MAP[app]||[]).map(r=>`<option>${r}</option>`).join('');
+}
+function updatePendingRoles() {
+  const app = document.getElementById('pf-app').value;
+  document.getElementById('pf-role').innerHTML = '<option value="">Select role</option>' + (ROLE_MAP[app]||[]).map(r=>`<option>${r}</option>`).join('');
+}
+
+function openLogForm() {
+  document.getElementById('lf-date').value = TODAY;
+  document.getElementById('lf-audit').value = addMonths(TODAY, 6);
+  ['lf-name','lf-email','lf-title','lf-dept','lf-cc','lf-manager','lf-app','lf-role','lf-access','lf-ticket','lf-notes'].forEach(id => {
+    const el = document.getElementById(id); if(el){el.value='';el.classList.remove('error');}
+  });
+  document.getElementById('lf-error').style.display = 'none';
+  updateRoles();
+  document.getElementById('log-modal').classList.add('open');
+}
+function closeLogForm() { document.getElementById('log-modal').classList.remove('open'); }
+
+async function submitLogForm() {
+  const req = ['lf-name','lf-email','lf-title','lf-dept','lf-cc','lf-app','lf-role','lf-ticket','lf-date'];
+  let valid = true;
+  req.forEach(id => { const el=document.getElementById(id); el.classList.remove('error'); if(!el.value.trim()){el.classList.add('error');valid=false;} });
+  if (!valid) { document.getElementById('lf-error').style.display='block'; return; }
+  document.getElementById('lf-error').style.display = 'none';
+
+  const btn = document.getElementById('lf-submit');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  const record = {
+    user_name: document.getElementById('lf-name').value.trim(),
+    email: document.getElementById('lf-email').value.trim(),
+    job_title: document.getElementById('lf-title').value.trim(),
+    department: document.getElementById('lf-dept').value,
+    cost_center: document.getElementById('lf-cc').value.trim(),
+    application: document.getElementById('lf-app').value,
+    role_name: document.getElementById('lf-role').value,
+    access_level: document.getElementById('lf-access').value || null,
+    approved_date: document.getElementById('lf-date').value,
+    next_audit_date: document.getElementById('lf-audit').value || null,
+    ticket_ref: document.getElementById('lf-ticket').value.trim(),
+    line_manager: document.getElementById('lf-manager').value.trim() || null,
+    notes: document.getElementById('lf-notes').value.trim() || null,
+  };
+
+  try {
+    const res = await api('POST', 'active_roles', record);
+    activeRoles.unshift(res[0]);
+    renderAll();
+    closeLogForm();
+    showToast(`Role logged — ${record.user_name} · ${record.role_name} · ${record.ticket_ref}`);
+  } catch(e) {
+    showToast('Failed to save: ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Log role';
+  }
+}
+
+function openPendingForm() {
+  ['pf-id','pf-user','pf-app','pf-role','pf-awaiting'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';el.classList.remove('error');}});
+  document.getElementById('pf-submitted').value = TODAY;
+  document.getElementById('pf-sla').value = addMonths(TODAY, 0).replace(/\d{2}$/, v => String(Math.min(parseInt(v)+3,28)).padStart(2,'0'));
+  document.getElementById('pf-error').style.display = 'none';
+  updatePendingRoles();
+  document.getElementById('pending-modal').classList.add('open');
+}
+function closePendingForm() { document.getElementById('pending-modal').classList.remove('open'); }
+
+async function submitPendingForm() {
+  const req = ['pf-id','pf-user','pf-app','pf-role','pf-submitted','pf-sla','pf-awaiting'];
+  let valid = true;
+  req.forEach(id=>{const el=document.getElementById(id);el.classList.remove('error');if(!el.value.trim()){el.classList.add('error');valid=false;}});
+  if (!valid) { document.getElementById('pf-error').style.display='block'; return; }
+
+  const btn = document.getElementById('pf-submit');
+  btn.disabled=true; btn.textContent='Saving...';
+
+  const record = {
+    request_id: document.getElementById('pf-id').value.trim(),
+    user_name: document.getElementById('pf-user').value.trim(),
+    role_name: document.getElementById('pf-role').value,
+    application: document.getElementById('pf-app').value,
+    submitted_date: document.getElementById('pf-submitted').value,
+    awaiting: document.getElementById('pf-awaiting').value,
+    sla_date: document.getElementById('pf-sla').value,
+  };
+
+  try {
+    const res = await api('POST', 'pending_approvals', record);
+    pendingApprovals.unshift(res[0]);
+    renderAll();
+    closePendingForm();
+    showToast('Pending request added.');
+  } catch(e) {
+    showToast('Failed to save: ' + e.message, true);
+  } finally {
+    btn.disabled=false; btn.textContent='Add request';
+  }
+}
+
+async function markApproved(id, reqId, userName) {
+  try {
+    await api('DELETE', 'pending_approvals', null, id);
+    pendingApprovals = pendingApprovals.filter(p => p.id !== id);
+    renderAll();
+    showToast(`${reqId} marked approved — log the role to Active Roles.`);
+  } catch(e) { showToast('Error: ' + e.message, true); }
+}
+
+let _revokeData = null;
+function confirmRevoke(id, userName, roleName) {
+  _revokeData = { id, userName, roleName };
+  document.getElementById('confirm-title').textContent = 'Revoke access';
+  document.getElementById('confirm-body').innerHTML = `You are about to revoke <strong>${roleName}</strong> for <strong>${userName}</strong>.<br><br>This will move the record to Revoked Roles and cannot be undone.`;
+  document.getElementById('confirm-ok').onclick = executeRevoke;
+  document.getElementById('confirm-modal').classList.add('open');
+}
+function closeConfirm() { document.getElementById('confirm-modal').classList.remove('open'); _revokeData = null; }
+
+async function executeRevoke() {
+  if (!_revokeData) return;
+  const { id, userName, roleName } = _revokeData;
+  const rec = activeRoles.find(r => r.id === id);
+  if (!rec) return;
+
+  try {
+    const revokedRecord = {
+      user_name: rec.user_name, role_name: rec.role_name, application: rec.application,
+      approved_date: rec.approved_date, revoked_date: TODAY,
+      reason: 'Revoked by IAM Admin', revoked_by: 'IAM Admin',
+    };
+    await Promise.all([
+      api('DELETE', 'active_roles', null, id),
+      api('POST', 'revoked_roles', revokedRecord),
+    ]);
+    activeRoles = activeRoles.filter(r => r.id !== id);
+    const res = await api('GET', 'revoked_roles');
+    revokedRoles = res || [];
+    renderAll();
+    closeConfirm();
+    showToast(`Access revoked for ${userName} — ${roleName}.`);
+  } catch(e) { showToast('Error: ' + e.message, true); closeConfirm(); }
+}
+
+async function resolveAudit(id, userName, roleName, application, decision) {
+  try {
+    await api('PATCH', `audit_queue?id=eq.${id}`, { decision, manager_response: decision === 'keep' ? 'Confirmed — still needed' : 'Access no longer required' });
+    if (decision === 'revoke') {
+      const revokedRecord = {
+        user_name: userName, role_name: roleName, application,
+        revoked_date: TODAY, reason: 'Audit review — access no longer required', revoked_by: 'IAM Admin',
+      };
+      await api('POST', 'revoked_roles', revokedRecord);
+      const arIdx = activeRoles.findIndex(r => r.user_name === userName && r.role_name === roleName);
+      if (arIdx > -1) { await api('DELETE', 'active_roles', null, activeRoles[arIdx].id); }
+    }
+    await loadAll();
+    showToast(decision === 'keep' ? `${userName} — ${roleName} recertified.` : `${userName} — ${roleName} revoked via audit.`);
+  } catch(e) { showToast('Error: ' + e.message, true); }
+}
+
+function exportCSV() {
+  const headers = ['User','Email','Job Title','Department','Cost Center','Application','Role','Access Level','Approved Date','Next Audit','Ticket','Manager','Status'];
+  const rows = activeRoles.map(r => [
+    r.user_name, r.email, r.job_title, r.department, r.cost_center, r.application, r.role_name,
+    r.access_level, r.approved_date, r.next_audit_date, r.ticket_ref, r.line_manager,
+    isOverdue(r.next_audit_date) ? 'Audit Overdue' : 'Active'
+  ]);
+  const csv = [headers,...rows].map(r=>r.map(v=>`"${(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'iam_active_roles_' + TODAY + '.csv';
+  a.click();
+}
+
+let _toastTimer;
+function showToast(msg, error=false) {
+  const t = document.getElementById('toast');
+  const dot = document.getElementById('toast-dot');
+  document.getElementById('toast-msg').textContent = msg;
+  t.className = error ? 'error-toast' : '';
+  dot.className = error ? 'toast-dot red' : 'toast-dot';
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(hideToast, 4500);
+}
+function hideToast() { document.getElementById('toast').classList.remove('show'); }
+
+// Resolve PATCH url quirk
+const _origApi = api;
+window.api = async function(method, table, body, id) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Not configured');
+  let url = `${SUPABASE_URL}/rest/v1/${table}`;
+  if (id) url += `?id=eq.${id}`;
+  const headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  };
+  const fetchUrl = method === 'GET' ? url + (url.includes('?') ? '&' : '?') + 'order=created_at.desc' : url;
+  const res = await fetch(fetchUrl, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  if (!res.ok) { const e = await res.text(); throw new Error(e); }
+  if (method === 'DELETE') return;
+  return res.json();
+};
+
+loadAll();
+setInterval(loadAll, 30000);
+</script>
+</body>
+</html>
